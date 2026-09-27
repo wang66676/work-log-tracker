@@ -3415,14 +3415,21 @@ function checkUpdate(manual){
       var notes=(d.notes||"").replace(/\n/g,"<br>");
       var h='<div class="modal-head"><h3>🎉 发现新版本 v'+esc(d.version)+'</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>';
       h+='<div class="small muted mb8">当前版本 v'+APP_VERSION+' · 发布日期 '+esc(d.date||"")+'</div>';
+      h+='<div class="footnote mb10" style="color:#0f7a57">✅ 更新不会删除已录入数据（请直接覆盖安装，不要先卸载）；为稳妥建议先点下面「先备份再更新」。</div>';
       if(notes) h+='<div class="footnote mb12" style="line-height:1.8">'+notes+'</div>';
       h+='<div class="row wrap" style="gap:8px;justify-content:flex-end">';
       if(d.apk) h+='<a class="btn pri" href="'+esc(d.apk)+'" target="_blank" rel="noopener" onclick="closeModal()">⬇️ 下载安卓版</a>';
       if(d.setup) h+='<a class="btn" href="'+esc(d.setup)+'" target="_blank" rel="noopener" onclick="closeModal()">⬇️ 下载电脑版</a>';
+      h+='<button class="btn" onclick="backupThenUpdate(\''+(d.apk||d.setup||"")+'\')">📦 先备份再更新</button>';
       h+='<button class="btn ghost" onclick="reloadForUpdate()">🔄 更新网页版</button></div>';
       openModal(h);
     } else if(manual){ toast("已是最新版本 v"+APP_VERSION,"ok"); }
   }).catch(function(){ if(manual) toast("检查更新失败：请检查网络后重试","bad"); });
+}
+function backupThenUpdate(url){
+  try{ exportJson(); }catch(e){}
+  toast("已导出数据备份，随后继续更新…","ok");
+  setTimeout(function(){ if(url){ try{ window.open(url,"_blank"); }catch(e){} } else { reloadForUpdate(); } }, 800);
 }
 function reloadForUpdate(){
   try{ if(navigator.serviceWorker){ navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ r.update(); }); }); } }catch(e){}
