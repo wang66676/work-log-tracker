@@ -592,6 +592,7 @@ function vTasks(){
 function taskRowHtml(w){
   var info=workDueInfo(w);
   var prog=workProgress(w);
+  var tnx=nextTimeNode(w);
   var riskCls = info&&(info.lv==="overdue"||info.lv==="hi")?" risk-hi":(info&&info.lv==="md"?" risk-md":"");
   var dInfoTxt="";
   if(info&&info.lv!==""){
@@ -607,7 +608,7 @@ function taskRowHtml(w){
   var h='<div class="item '+riskCls+'" '+qs+' onclick="go(\'#/task/'+encodeURIComponent(w.id)+'\')">';
   h+='<div class="avatar">'+(w.status==="done"?"✓":esc((w.title||"?").trim().charAt(0))) +'</div>';
   h+='<div class="body"><div class="t '+(w.status==="done"?"strike":"")+'">'+(w.priority?'<span class="pri-chip '+PRI[w.priority].cls+'" style="margin-right:5px">'+PRI[w.priority].label+'</span>':'')+esc(w.title)+'</div>';
-  h+='<div class="meta"><span class="badge '+W_STATUS[w.status].cls+'">'+W_STATUS[w.status].label+'</span><span class="badge gray">'+esc(catName(w.categoryId))+'</span>'+dInfoTxt+(w.today&&w.status==="active"?'<span class="badge warn">📌 今日</span>':'')+(n?'<span>☑️ '+nd+'/'+n+' 节点</span>':'')+'</div>';
+  h+='<div class="meta"><span class="badge '+W_STATUS[w.status].cls+'">'+W_STATUS[w.status].label+'</span><span class="badge gray">'+esc(catName(w.categoryId))+'</span>'+dInfoTxt+(w.today&&w.status==="active"?'<span class="badge warn">📌 今日</span>':'')(n?'<span>☑️ '+nd+'/'+n+' 节点</span>':'')+(tnx?'<span class="badge warn">⏱ 下次 '+esc(fmtNodeShort(tnx.at))+'</span>':'')+'</div>';
   if(w.description) h+='<div class="desc">'+esc(w.description)+'</div>';
   h+='</div>';
   h+='<div class="row" style="flex-shrink:0;align-items:center;gap:4px">';
@@ -702,6 +703,26 @@ function vTaskDetail(w){
       h+='<button class="icon-btn" title="删除" onclick="delNode(\''+w.id+'\',\''+nd.id+'\')">🗑</button>';
       h+='</span></div>';
     });
+  }
+  h+='</div>';
+
+  /* 跟进时间节点 */
+  var tls=(w.timeline||[]).slice().sort(tlSort);
+  var pendT=tls.filter(function(x){return x.status!=="done";});
+  var doneT=tls.filter(function(x){return x.status==="done";});
+  var nxtN=nextTimeNode(w);
+  h+='<div class="card"><div class="card-title">⏱ 跟进时间节点 <span class="sub">'+pendT.length+' 个待跟进 / 共 '+tls.length+' 个</span><span class="ln grow"></span><button class="btn mini pri" onclick="openTimeNodeModal(\''+w.id+'\',null)">＋ 新增时间节点</button></div>';
+  if(nxtN){ h+='<div class="banner-warn mb12" style="border-radius:10px"><span style="font-size:18px">⏰</span><div class="grow"><b>下次跟进：'+esc(fmtNodeAt(nxtN.at))+'</b><div style="font-size:13px;margin-top:2px">'+esc(nxtN.title)+(nxtN.note?' · '+esc(nxtN.note):'')+'</div></div><button class="btn ok mini" onclick="toggleTimeNode(\''+w.id+'\',\''+nxtN.id+'\')">标记已跟进</button></div>'; }
+  if(!tls.length){ h+='<div class="small muted" style="padding:6px 0">还没有时间节点。新增后系统会保存到本工作条，并按最新时间提醒你继续跟进。</div>'; }
+  else {
+    h+='<div class="listbox" style="padding:2px 12px">';
+    pendT.forEach(function(n){
+      h+='<div class="item" style="align-items:center"><div class="avatar" style="background:var(--warn-bg);color:var(--warn)">⏱</div><div class="body"><div class="t small">'+esc(n.title)+'</div><div class="meta"><span class="badge warn">待跟进</span><span>'+esc(fmtNodeAt(n.at))+'</span>'+(n.note?'<span>'+esc(n.note)+'</span>':'')+'</div></div><div class="row" style="gap:4px"><button class="btn ok mini" onclick="toggleTimeNode(\''+w.id+'\',\''+n.id+'\')">已跟进</button>'+(isAdmin()?'<button class="icon-btn" onclick="openTimeNodeModal(\''+w.id+'\',\''+n.id+'\')">✏️</button><button class="icon-btn" onclick="delTimeNode(\''+w.id+'\',\''+n.id+'\')">🗑</button>':'')+'</div></div>';
+    });
+    doneT.sort(function(a,b){return (b.doneAt||0)-(a.doneAt||0);}).forEach(function(n){
+      h+='<div class="item" style="align-items:center;opacity:.75"><div class="avatar" style="background:var(--ok-bg);color:var(--ok)">✓</div><div class="body"><div class="t small strike">'+esc(n.title)+'</div><div class="meta"><span class="badge done">已跟进</span><span>'+esc(fmtNodeAt(n.at))+'</span>'+(n.doneAt?'<span>完成于 '+fmtDT(n.doneAt)+'</span>':'')+'</div></div><div class="row" style="gap:4px"><button class="btn mini" onclick="toggleTimeNode(\''+w.id+'\',\''+n.id+'\')">恢复</button>'+(isAdmin()?'<button class="icon-btn" onclick="delTimeNode(\''+w.id+'\',\''+n.id+'\')">🗑</button>':'')+'</div></div>';
+    });
+    h+='</div>';
   }
   h+='</div>';
 
@@ -1724,6 +1745,12 @@ function vSettings(){
   h+='<p class="footnote">说明：OCR 需联网（自动加载 tesseract.js 引擎，首次约10-40秒）；扫描/手写效果有限；离线时上传图片仍会作为附件保存。</p>';
   h+='</div>';
 
+  h+='<div class="card"><div class="card-title">🔄 在线更新</div>';
+  h+='<div class="set-row"><span class="ic">📦</span><div class="grow"><b>当前版本 v'+APP_VERSION+'</b><div class="small muted">发布日期 '+APP_BUILD+' · 检查是否有新版本（网页版/安卓版）</div></div><button class="btn mini pri" onclick="checkUpdate(true)">检查更新</button></div>';
+  h+='<div class="set-row"><span class="ic">🗓️</span><div class="grow"><b>每天自动检查更新</b><div class="small muted">打开应用时自动检查一次，有新版本会弹窗提示</div></div><button class="switch '+((state.settings&&state.settings.autoUpdate===false)?"":"on")+'" onclick="toggleAutoUpdate(!(state.settings&&state.settings.autoUpdate!==false))"></button></div>';
+  h+='<p class="footnote">更新源：'+esc(UPDATE_MANIFEST_URL)+'（网页版直接刷新更新；安卓版会跳到下载页）。</p>';
+  h+='</div>';
+
   /* 数据统计 */
   var attCount=0; state.workItems.forEach(function(w){ attCount+=((w.attachments||[]).length); (w.logs||[]).forEach(function(l){attCount+=((l.attachments||[]).length);}); });
   state.plans.forEach(function(p){ attCount+=(p.attachments||[]).length; });
@@ -1922,7 +1949,9 @@ function exportExcel(){
   });
   var ws6=[["分类","未完成数","排序"]];
   state.categories.slice().sort(function(a,b){return a.sort-b.sort;}).forEach(function(c){ ws6.push([c.name,catCount(c.id),c.sort+1]); });
-  var sheets=[{name:"工作条汇总",rows:ws1},{name:"节点明细",rows:ws2},{name:"进度记录",rows:ws3},{name:"分期计划",rows:ws4},{name:"分期明细",rows:ws5},{name:"分类统计",rows:ws6}];
+  var ws7=[["所属工作条","时间节点","计划时间","状态","备注","完成时间"]];
+  state.workItems.forEach(function(w){ (w.timeline||[]).slice().sort(tlSort).forEach(function(n){ ws7.push([w.title,n.title,n.at||"",(n.status==="done"?"已跟进":"待跟进"),n.note||"",n.doneAt?fmtDT(n.doneAt):""]); }); });
+  var sheets=[{name:"工作条汇总",rows:ws1},{name:"节点明细",rows:ws2},{name:"进度记录",rows:ws3},{name:"时间节点",rows:ws7},{name:"分期计划",rows:ws4},{name:"分期明细",rows:ws5},{name:"分类统计",rows:ws6}];
   try{
     var zip=zipStore(xlsxFiles(sheets));
     var blob=new Blob([zip],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
@@ -2688,10 +2717,15 @@ async function doLogin(u,pwd){
   var h=await shaHex(found.salt+pwd);
   if(h!==found.hash){ toast("密码错误","bad"); return; }
   sessionStorage.setItem(SESSION_KEY,found.id);
+  try{
+    localStorage.setItem("wlog_last_user",found.username);
+    var cb=document.getElementById("lgAuto");
+    if(cb&&cb.checked) setAutoLogin(found); else setAutoLogin(null);
+  }catch(e){}
   toast("欢迎，"+(found.name||found.username),"ok");
   go("#/home");
 }
-function logout(){ sessionStorage.removeItem(SESSION_KEY); router(); toast("已退出登录"); }
+function logout(){ sessionStorage.removeItem(SESSION_KEY); setAutoLogin(null); try{ localStorage.removeItem("wlog_last_user"); }catch(e){} router(); toast("已退出登录"); }
 function vLogin(){
   var isFirst=state.users&&state.users.length===1&&state.users[0].username==="admin"&&!state.users[0].pwdChanged;
   var h='<div style="max-width:420px;margin:6vh auto 0">';
@@ -2699,12 +2733,31 @@ function vLogin(){
   h+='<form onsubmit="event.preventDefault();doLogin(document.getElementById(\'lgUser\').value.trim(),document.getElementById(\'lgPwd\').value)">';
   h+='<div class="field"><label>用户名</label><input class="inp" id="lgUser" autocomplete="username" required placeholder="请输入用户名"></div>';
   h+='<div class="field"><label>密码</label><input class="inp" type="password" id="lgPwd" autocomplete="current-password" required placeholder="请输入密码"></div>';
+  h+='<div class="row between wrap mb10"><label class="inline-lbl"><input type="checkbox" id="lgAuto"> 自动登录（下次免输入）</label><span class="small muted">已填账号密码时自动提交，无需点按钮</span></div>';
   h+='<button class="btn pri btn-block" type="submit">登 录</button></form>';
   if(isFirst) h+='<div class="footnote mt14" style="text-align:center">首次使用默认管理员：<b>admin / admin123</b><br>登录后请到「我的 → 修改密码」尽快修改</div>';
   h+='</div><div class="small muted" style="text-align:center;margin-top:14px">数据保存在当前设备浏览器；多台设备共用账号与数据需部署服务端（见使用说明）。</div></div>';
   return h;
 }
-function bindLogin(){ var e=document.getElementById("lgUser"); if(e) e.focus(); }
+function bindLogin(){
+  var u=document.getElementById("lgUser"), pw=document.getElementById("lgPwd"), cb=document.getElementById("lgAuto");
+  try{ var last=localStorage.getItem("wlog_last_user"); if(u&&last&&!u.value) u.value=last; }catch(e){}
+  if(cb){ var a=getAutoLogin(); if(a&&a.username) cb.checked=true; }
+  var timer=null, lastTry="";
+  function maybe(){
+    if(!cb||!cb.checked) return;
+    var us=(u&&u.value||"").trim(), pwd=(pw&&pw.value||"");
+    if(!us||!pwd) return;
+    var sig=us+"|"+pwd;
+    if(sig===lastTry) return;
+    clearTimeout(timer);
+    timer=setTimeout(function(){ lastTry=sig; doLogin(us,pwd); },500);
+  }
+  if(u) u.addEventListener("input",maybe);
+  if(pw) pw.addEventListener("input",maybe);
+  if(cb) cb.addEventListener("change",maybe);
+  if(u) u.focus();
+}
 /* 修改密码 */
 function pwdModal(){
   var u=curUser(); if(!u) return;
@@ -3300,15 +3353,98 @@ async function tryOcrAppend(f,taEl,statusEl){
 function nwTakePhoto(){ var inp=document.getElementById("nwCamIn"); if(inp) inp.click(); }
 function instTakePhoto(){ var inp=document.getElementById("instCamIn"); if(inp) inp.click(); }
 
+/* ================= 自动登录 ================= */
+var AUTOLOGIN_KEY="wlog_autologin_v1";
+function setAutoLogin(u){ try{ if(u) localStorage.setItem(AUTOLOGIN_KEY, JSON.stringify({uid:u.id,username:u.username,at:Date.now()})); else localStorage.removeItem(AUTOLOGIN_KEY); }catch(e){} }
+function getAutoLogin(){ try{ return JSON.parse(localStorage.getItem(AUTOLOGIN_KEY)||"null"); }catch(e){ return null; } }
+function tryAutoLogin(){
+  if(curUser()) return true;
+  var a=getAutoLogin(); if(!a||!a.uid) return false;
+  for(var i=0;i<state.users.length;i++){ var u=state.users[i]; if(u.id===a.uid&&u.active!==false){ sessionStorage.setItem(SESSION_KEY,u.id); return true; } }
+  setAutoLogin(null); return false;
+}
+/* ================= 工作条：跟进时间节点 ================= */
+function tlSort(a,b){ return (a.at<b.at?-1:(a.at>b.at?1:0)); }
+function nextTimeNode(w){ if(!w||!w.timeline) return null; var arr=w.timeline.filter(function(n){return n.status!=="done";}).sort(tlSort); return arr[0]||null; }
+function fmtNodeAt(at){ if(!at) return ""; var d=new Date(at); if(isNaN(d)) return at; var p=function(x){return String(x).padStart(2,"0")}; var wd=["周日","周一","周二","周三","周四","周五","周六"][d.getDay()]; return (d.getMonth()+1)+"月"+d.getDate()+"日 "+wd+" "+p(d.getHours())+":"+p(d.getMinutes()); }
+function fmtNodeShort(at){ if(!at) return ""; var d=new Date(at); if(isNaN(d)) return at; var p=function(x){return String(x).padStart(2,"0")}; return (d.getMonth()+1)+"/"+d.getDate()+" "+p(d.getHours())+":"+p(d.getMinutes()); }
+function openTimeNodeModal(workId,nodeId){
+  var w=getWork(workId); if(!w) return;
+  var nd=null; (w.timeline||[]).forEach(function(x){ if(x.id===nodeId) nd=x; });
+  var def=new Date(Date.now()+60*60*1000); var p=function(x){return String(x).padStart(2,"0")};
+  var defStr=def.getFullYear()+"-"+p(def.getMonth()+1)+"-"+p(def.getDate())+"T"+p(def.getHours())+":"+p(def.getMinutes());
+  openModal('<div class="modal-head"><h3>'+(nd?"编辑时间节点":"新增跟进时间节点")+'</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>'
+    +'<form onsubmit="timeNodeSave(event,\''+workId+'\',\''+(nd?nd.id:"")+'\')">'
+    +'<div class="field"><label>节点内容 <span class="req">*</span></label><input class="inp" id="tnTitle" required maxlength="60" placeholder="如：电话回访确认交期" value="'+esc(nd?nd.title:"")+'"></div>'
+    +'<div class="field"><label>跟进时间 <span class="req">*</span></label><input class="inp" type="datetime-local" id="tnAt" required value="'+esc(nd?nd.at:defStr)+'"></div>'
+    +'<div class="field"><label>备注（可选）</label><textarea class="inp" id="tnNote" style="min-height:56px">'+esc(nd?nd.note:"")+'</textarea></div>'
+    +'<p class="footnote">新增的时间节点会保存在本工作条里，旧节点全部保留，按最新时间继续跟进。</p>'
+    +'<div class="row" style="justify-content:flex-end;gap:8px"><button type="button" class="btn ghost" onclick="closeModal()">取消</button><button class="btn pri">保存节点</button></div></form>');
+}
+function timeNodeSave(e,workId,nodeId){
+  e.preventDefault();
+  var w=getWork(workId); if(!w) return;
+  var title=document.getElementById("tnTitle").value.trim();
+  var at=document.getElementById("tnAt").value;
+  if(!title||!at){ toast("请填写节点内容与时间","bad"); return; }
+  if(!w.timeline) w.timeline=[];
+  if(nodeId){ w.timeline.forEach(function(n){ if(n.id===nodeId){ n.title=title; n.at=at; n.note=document.getElementById("tnNote").value.trim(); } }); }
+  else { w.timeline.push({id:uid("tn"),title:title,at:at,note:document.getElementById("tnNote").value.trim(),status:"pending",createdAt:Date.now(),createdBy:(curUser()?curUser().id:""),doneAt:null}); }
+  touch(w); saveState(); closeModal(); toast("时间节点已保存 ✓","ok"); router();
+}
+function toggleTimeNode(workId,nodeId){
+  var w=getWork(workId); if(!w) return;
+  (w.timeline||[]).forEach(function(n){ if(n.id===nodeId){ if(n.status==="done"){ n.status="pending"; n.doneAt=null; } else { n.status="done"; n.doneAt=Date.now(); } } });
+  touch(w); saveState(); router();
+}
+function delTimeNode(workId,nodeId){
+  var w=getWork(workId); if(!w) return;
+  if(!isAdmin()){ toast("删除时间节点需管理员操作","bad"); return; }
+  confirmDlg("删除这个时间节点？（其它节点不受影响）",function(){ w.timeline=(w.timeline||[]).filter(function(n){return n.id!==nodeId;}); touch(w); saveState(); router(); });
+}
+/* ================= 在线更新 ================= */
+var APP_VERSION="2.1.0";
+var APP_BUILD="2026-09-27";
+var UPDATE_MANIFEST_URL="https://wang66676.github.io/work-log-tracker/update.json";
+function cmpVer(a,b){ var x=String(a).split("."), y=String(b).split("."); for(var i=0;i<3;i++){ var n=parseInt(x[i]||"0",10)||0, m=parseInt(y[i]||"0",10)||0; if(n>m) return 1; if(n<m) return -1; } return 0; }
+function checkUpdate(manual){
+  var url=UPDATE_MANIFEST_URL+"?t="+Date.now();
+  fetch(url,{cache:"no-store"}).then(function(r){ return r.json(); }).then(function(d){
+    try{ state.settings=state.settings||{}; state.settings.lastUpdateCheck=todayStr(); saveState(); }catch(e){}
+    if(d&&d.version&&cmpVer(d.version,APP_VERSION)>0){
+      var notes=(d.notes||"").replace(/\n/g,"<br>");
+      var h='<div class="modal-head"><h3>🎉 发现新版本 v'+esc(d.version)+'</h3><button class="icon-btn" onclick="closeModal()">✕</button></div>';
+      h+='<div class="small muted mb8">当前版本 v'+APP_VERSION+' · 发布日期 '+esc(d.date||"")+'</div>';
+      if(notes) h+='<div class="footnote mb12" style="line-height:1.8">'+notes+'</div>';
+      h+='<div class="row wrap" style="gap:8px;justify-content:flex-end">';
+      if(d.apk) h+='<a class="btn pri" href="'+esc(d.apk)+'" target="_blank" rel="noopener" onclick="closeModal()">⬇️ 下载安卓版</a>';
+      if(d.setup) h+='<a class="btn" href="'+esc(d.setup)+'" target="_blank" rel="noopener" onclick="closeModal()">⬇️ 下载电脑版</a>';
+      h+='<button class="btn ghost" onclick="reloadForUpdate()">🔄 更新网页版</button></div>';
+      openModal(h);
+    } else if(manual){ toast("已是最新版本 v"+APP_VERSION,"ok"); }
+  }).catch(function(){ if(manual) toast("检查更新失败：请检查网络后重试","bad"); });
+}
+function reloadForUpdate(){
+  try{ if(navigator.serviceWorker){ navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ r.update(); }); }); } }catch(e){}
+  var u=location.href.split("#")[0].split("?")[0]+"?v="+Date.now()+location.hash;
+  location.replace(u);
+}
+function toggleAutoUpdate(on){ state.settings=state.settings||{}; state.settings.autoUpdate=!!on; saveState(); toast(on?"已开启每天自动检查更新":"已关闭自动检查","ok"); }
+function maybeAutoUpdate(){ if(state.settings&&state.settings.autoUpdate===false) return; var last=state.settings&&state.settings.lastUpdateCheck; if(last===todayStr()) return; checkUpdate(false); }
+function registerSW(){ try{ if("serviceWorker" in navigator && (location.protocol==="http:"||location.protocol==="https:")){ navigator.serviceWorker.register("./sw.js").catch(function(){}); } }catch(e){} }
+
 /* ================= 启动 ================= */
 async function boot(){
   if(!state.settings) state.settings={notify:false,welcome:false};
   await ensureUsers();
+  tryAutoLogin();
   if(!location.hash||location.hash==="#"){ history.replaceState(null,"","#/home"); }
   router();
   bindFlexInputs();
   setTimeout(function(){ if(!state.settings.welcome&&!state.workItems.length&&!state.plans.length&&isAdmin()) showWelcome(); },350);
   checkNotify();
+  registerSW();
+  if(curUser()) setTimeout(function(){ maybeAutoUpdate(); },1500);
   setInterval(updateCountdowns,60000);
 }boot();
 </script>
