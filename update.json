@@ -1,7 +1,7 @@
 {
-  "version": "2.1.0",
-  "date": "2026-09-27",
-  "notes": "新增：① 登录支持自动登录（勾选后免点击、下次免输入）；② 每个工作条可新增跟进时间节点，旧时间节点全部保留并按新节点继续跟进；③ 在线更新（网页版一键刷新，安卓版下载新 APK，电脑版下载新安装包）。",
+  "version": "2.1.1",
+  "date": "2026-09-30",
+  "notes": "修复：①「工作」模块/首页“未完成工作”进不去、列表空白的问题；②“载入示例/清空数据”不再影响账号，已录入数据更安全；③「我的」页面默认收起说明文字，只保留功能操作（可一键展开）。",
   "apk": "https://wang66676.github.io/work-log-tracker/工作日志跟进系统.apk",
-  "setup": "https://github.com/wang66676/work-log-tracker/releases/download/v2.1.0/WorkLogTracker-Setup-2.1.0.exe"
+  "setup": "https://github.com/wang66676/work-log-tracker/releases/download/v2.1.1/WorkLogTracker-Setup-2.1.1.exe"
 }
